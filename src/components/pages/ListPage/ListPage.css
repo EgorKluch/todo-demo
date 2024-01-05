@@ -1,0 +1,10 @@
+.ListPage__item {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #CCC;
+    padding-bottom: 8px;
+}
+
+.ListPage__link {
+    flex: 1;
+}
