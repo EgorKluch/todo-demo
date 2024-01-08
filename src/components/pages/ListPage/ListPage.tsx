@@ -1,59 +1,41 @@
-import {FC, useCallback, useEffect, useMemo, useState} from "react";
+import {FC, useMemo, useState} from "react";
 import {Button, Container, Form} from "react-bootstrap";
-import {api} from "../../../api";
-import {Item, Item as ItemType} from '../../../types/Item';
+import {api, urls} from "../../../api";
+import {Item as ItemType} from '../../../types/Item';
 import './ListPage.css';
 import {useLoader} from "../../../hooks/useLoader";
-import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import useSWR from 'swr';
+import useSWRMutation from 'swr/mutation';
+import { Item } from "./Item";
+
+const AddItemButton = () => {
+  const { trigger, isMutating } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.addItem(arg))
+  
+  useLoader(isMutating);
+  
+  return (
+    <Button
+      style={{ marginRight: 8 }}
+      onClick={() => {
+        const newItem = {
+          id: +new Date(),
+          text: 'New item',
+          checked: false
+        };
+        trigger(newItem);
+      }}
+    >Add item</Button>
+  )
+}
 
 export const ListPage: FC = () => {
-  const loader = useLoader();
+  const {data: items = [], isLoading} = useSWR(urls.item, (url) => api.getItemList());
+  
+  useLoader(isLoading);
 
-  // Не использовать локальный стейт для демонстрации
-  const [items, setItems] = useState<ItemType[]>([]);
   const [onlyChecked, setOnlyChecked] = useState(false);
-  const [removingItem, setRemovingItem] = useState<ItemType | null>(null);
 
-  // Для демонстрации аля селекторов добавил фильтрацию
-  const filteredItems = useMemo(() => {
-    if (!onlyChecked) return items;
-    return items.filter((item) => item.checked);
-  }, [items, onlyChecked]);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    api.getItemList()
-      .then((items) => setItems(items))
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
-
-  function renderItem(item: Item) {
-    return (
-      <div className='ListPage__item mb-2' key={item.id}>
-        <Form.Check
-          className='m-2'
-          checked={item.checked}
-          onChange={() => {
-            if (!item.id) return;
-            const newItem = {...item, checked: !item.checked};
-            setItems(items.map((item) => item.id === newItem.id ? newItem : item));
-          }}
-        />
-        <div className='ListPage__link'><a href={`item/${item.id}`}>{item.text}</a></div>
-        {item.id === 0 ? null : (
-          <Button
-            variant="outline-secondary"
-            size='sm'
-            onClick={() => setRemovingItem(item)}
-          >X</Button>
-        )}
-      </div>
-    );
-  }
+  const filteredItems = useMemo(() => !onlyChecked ? items : items?.filter((item) => item.checked), [items, onlyChecked]);
 
   return (
     <Container className='mt-3' style={{ width: 800 }}>
@@ -65,33 +47,14 @@ export const ListPage: FC = () => {
         onChange={() => setOnlyChecked(!onlyChecked)}
       />
       <div className='mt-4 mb-4'>
-        {renderItem({
+        {<Item item={{
           id: 0,
           text: 'Not exists item (for error testing)',
           checked: true,
-        })}
-        {filteredItems.map(renderItem)}
+        }} />}
+        {filteredItems.map((item) => <Item item={item} />)}
       </div>
-      <Button
-        style={{ marginRight: 8 }}
-        onClick={() => {
-          const newItem = {
-            id: +new Date(),
-            text: 'New item',
-            checked: false
-          };
-          setItems([...items, newItem]);
-          api.addItem(newItem);
-        }}
-      >Add item</Button>
-      <Button
-        onClick={() => {
-          const hideLoader = loader.show();
-          api.updateItemList(items)
-            .then(fetch)
-            .finally(hideLoader);
-        }}
-      >Save</Button>
+      <AddItemButton />
       <h3 className='mt-5'>Cache invalidation</h3>
       <p>Please check scenario:</p>
       <ul>
@@ -99,16 +62,6 @@ export const ListPage: FC = () => {
         <li>Change the item</li>
         <li>Come back here and check that data will update</li>
       </ul>
-      <ConfirmModal
-        show={!!removingItem}
-        title='Remove item'
-        onApply={() => {
-          if (!removingItem) return;
-          setItems(items.filter(({ id }) => id !== removingItem.id));
-          setRemovingItem(null);
-        }}
-        onCancel={() => setRemovingItem(null)}
-      />
     </Container>
   );
 };

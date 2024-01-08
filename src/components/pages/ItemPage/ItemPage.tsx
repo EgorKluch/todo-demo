@@ -1,47 +1,32 @@
-import {FC, useCallback, useEffect, useState} from "react";
+import {FC, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
 import {Item} from "../../../types/Item";
-import {api} from "../../../api";
+import {RespErr, api, urls} from "../../../api";
 import {Button, Container, Form} from "react-bootstrap";
 import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import useSWR from "swr";
+import useSWRMutation from "swr/mutation";
 
 export const ItemPage: FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const {data: item, isLoading, error} = useSWR<Item, RespErr>(id, (url: string) => api.getItem(Number(url)))
+  const { trigger: updateItemTrigger, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: Item}) => api.updateItem(arg))
+  const { trigger: removeItemTrigger, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, 
+    (url, {arg}: {arg: number}) => api.removeItem(arg).then(() => navigate('/'))
+  );
 
-  const loader = useLoader();
+  useLoader(isLoading || isMutatingRemoveItem || isMutatingUpdateItem);
 
-  // Не использовать локальный стейт для демонстрации
-  const [item, setItem] = useState<Item | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [itemDraft, setItemDraft] = useState<Item>();
+
   const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    // Специально не передал пропсом
-    // В демо тоже должен лежать отдельно в стейте (не в стейте списка для главной страницы)
-    //    что бы проверить инвалидацию при переходе между страницами
-    api.getItem(Number(id))
-      .then((response) => {
-        if ('error' in response) {
-          setError(response.error);
-          return;
-        }
-
-        setItem(response);
-      })
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
 
   function renderContent() {
     if (error) {
       return (
-        <div style={{ color: 'red' }}>{error}</div>
+        <div style={{ color: 'red' }}>{error.error}</div>
       )
     }
 
@@ -55,15 +40,15 @@ export const ItemPage: FC = () => {
           <Form.Check
             type="checkbox"
             label="Checked"
-            checked={item.checked}
-            onChange={() => setItem({ ...item, checked: !item.checked })}
+            checked={itemDraft? itemDraft.checked : item?.checked}
+            onChange={() => setItemDraft({...item, checked: !item?.checked})}
           />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Text</Form.Label>
           <Form.Control
-            value={item.text}
-            onChange={(e) => setItem({ ...item, text: e.target.value })}
+            value={itemDraft ? itemDraft.text : item.text}
+            onChange={(e) => setItemDraft({ ...item, text: e.target.value })}
           />
         </Form.Group>
       </Form>
@@ -77,17 +62,16 @@ export const ItemPage: FC = () => {
       <div>
         <Button
           className='m-1'
+          disabled={!itemDraft}
           onClick={() => {
-            if (!item) return;
-            const hideLoader = loader.show();
-            api.updateItem(item)
-              .then(fetch)
-              .finally(hideLoader);
+            if (!itemDraft) return;
+            updateItemTrigger(itemDraft);
           }}
         >Save</Button>
         <Button
           className='m-1'
           variant='danger'
+          disabled={!item}
           onClick={() => setRemoveConfirmationOpened(true)}
         >Remove</Button>
         <Button className='m-1' href='/' variant='secondary'>Back</Button>
@@ -104,10 +88,7 @@ export const ItemPage: FC = () => {
         title='Remove item'
         onApply={() => {
           if (!item) return;
-          const hideLoader = loader.show();
-          api.removeItem(item.id)
-            .then(() => navigate('/'))
-            .finally(hideLoader);
+          removeItemTrigger(item.id);
         }}
         onCancel={() => setRemoveConfirmationOpened(false)}
       />

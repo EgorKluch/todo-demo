@@ -1,5 +1,7 @@
 import {Item} from "./types/Item";
 
+export type RespErr = {error: string}
+
 type Db = {
   items: Item[],
 }
@@ -23,6 +25,18 @@ function doRequest<TResponse>(fn: () => TResponse) {
   });
 }
 
+function doErrorRequest<TResponse>(errorObj: RespErr) {
+  return new Promise<TResponse>((res, rej) => {
+    setTimeout(() => {
+      rej(errorObj);
+    }, 500);
+  });
+}
+
+export const urls = {
+  item: '/item'
+}
+
 export const api = {
   getItemList() {
     console.log('getList')
@@ -36,9 +50,11 @@ export const api = {
       });
     });
   },
-  getItem(id: number) {
+  // should reject promise
+  getItem(id: number): Promise<Item> {
     console.log('getItem', id);
-    return doRequest(() => getDb().items.find((item) => item.id === id) || { error: 'Item not found' });
+    const item = getDb().items.find((item) => item.id === id);
+    return item ? doRequest(() => item) : doErrorRequest({ error: 'Item not found' });
   },
   addItem(newItem: Item) {
     console.log('addItem', newItem);
