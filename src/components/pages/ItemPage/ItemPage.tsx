@@ -1,6 +1,6 @@
 import {FC, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
-import {Item} from "../../../types/Item";
+import {ItemType} from "../../../types/Item";
 import {RespErr, api, urls} from "../../../api";
 import {Button, Container, Form} from "react-bootstrap";
 import {useLoader} from "../../../hooks/useLoader";
@@ -11,15 +11,15 @@ import useSWRMutation from "swr/mutation";
 export const ItemPage: FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {data: item, isLoading, error} = useSWR<Item, RespErr>(id, (url: string) => api.getItem(Number(url)))
-  const { trigger: updateItemTrigger, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: Item}) => api.updateItem(arg))
+  const {data: item, isLoading, error} = useSWR<ItemType, RespErr>(id, (url: string) => api.getItem(Number(url)))
+  const { trigger: updateItemTrigger, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
   const { trigger: removeItemTrigger, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, 
     (url, {arg}: {arg: number}) => api.removeItem(arg).then(() => navigate('/'))
   );
 
   useLoader(isLoading || isMutatingRemoveItem || isMutatingUpdateItem);
 
-  const [itemDraft, setItemDraft] = useState<Item>();
+  const [itemDraft, setItemDraft] = useState<ItemType>();
 
   const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
 

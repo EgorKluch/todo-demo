@@ -1,9 +1,9 @@
-import {Item} from "./types/Item";
+import {ItemType} from "./types/Item";
 
 export type RespErr = {error: string}
 
 type Db = {
-  items: Item[],
+  items: ItemType[],
 }
 
 function getDb(): Db {
@@ -42,7 +42,7 @@ export const api = {
     console.log('getList')
     return doRequest(() => getDb().items);
   },
-  updateItemList(items: Item[]) {
+  updateItemList(items: ItemType[]) {
     console.log('updateItemList', items);
     return doRequest(() => {
       setDb((db) => {
@@ -51,12 +51,12 @@ export const api = {
     });
   },
   // should reject promise
-  getItem(id: number): Promise<Item> {
+  getItem(id: number): Promise<ItemType> {
     console.log('getItem', id);
     const item = getDb().items.find((item) => item.id === id);
     return item ? doRequest(() => item) : doErrorRequest({ error: 'Item not found' });
   },
-  addItem(newItem: Item) {
+  addItem(newItem: ItemType) {
     console.log('addItem', newItem);
     return doRequest(() => {
       setDb((db) => {
@@ -67,7 +67,7 @@ export const api = {
       })
     });
   },
-  updateItem(newItem: Item) {
+  updateItem(newItem: ItemType) {
     console.log('updateItem', newItem);
     return doRequest(() => {
       setDb((db) => {

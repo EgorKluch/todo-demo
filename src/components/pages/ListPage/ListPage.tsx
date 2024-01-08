@@ -1,7 +1,7 @@
 import {FC, useMemo, useState} from "react";
 import {Button, Container, Form} from "react-bootstrap";
 import {api, urls} from "../../../api";
-import {Item as ItemType} from '../../../types/Item';
+import {ItemType as ItemType} from '../../../types/Item';
 import './ListPage.css';
 import {useLoader} from "../../../hooks/useLoader";
 import useSWR from 'swr';

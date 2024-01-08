@@ -1,5 +1,5 @@
 import React, {FC} from "react";
-import { Item as ItemType } from '../../../types/Item';
+import { ItemType as ItemType } from '../../../types/Item';
 import {Button, Form} from "react-bootstrap";
 import {api, urls} from "../../../api";
 import useSWRMutation from 'swr/mutation';
