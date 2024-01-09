@@ -1,35 +1,13 @@
-import {FC, useCallback, useEffect, useMemo, useState} from "react";
+import {FC} from "react";
 import {Button, Container, Form} from "react-bootstrap";
-import {api} from "../../../api";
-import {Item, Item as ItemType} from '../../../types/Item';
+import {Item} from '../../../types/Item';
 import './ListPage.css';
-import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import {ListPageProvider, useListPage} from "./hooks/useListPage";
+import {SWRConfig} from "swr";
 
-export const ListPage: FC = () => {
-  const loader = useLoader();
-
-  // Не использовать локальный стейт для демонстрации
-  const [items, setItems] = useState<ItemType[]>([]);
-  const [onlyChecked, setOnlyChecked] = useState(false);
-  const [removingItem, setRemovingItem] = useState<ItemType | null>(null);
-
-  // Для демонстрации аля селекторов добавил фильтрацию
-  const filteredItems = useMemo(() => {
-    if (!onlyChecked) return items;
-    return items.filter((item) => item.checked);
-  }, [items, onlyChecked]);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    api.getItemList()
-      .then((items) => setItems(items))
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
+const ListPageView: FC = () => {
+  const listPage = useListPage();
 
   function renderItem(item: Item) {
     return (
@@ -37,10 +15,9 @@ export const ListPage: FC = () => {
         <Form.Check
           className='m-2'
           checked={item.checked}
-          onChange={() => {
+          onChange={async () => {
             if (!item.id) return;
-            const newItem = {...item, checked: !item.checked};
-            setItems(items.map((item) => item.id === newItem.id ? newItem : item));
+            await listPage.change({...item, checked: !item.checked});
           }}
         />
         <div className='ListPage__link'><a href={`item/${item.id}`}>{item.text}</a></div>
@@ -48,7 +25,7 @@ export const ListPage: FC = () => {
           <Button
             variant="outline-secondary"
             size='sm'
-            onClick={() => setRemovingItem(item)}
+            onClick={() => listPage.remove.start(item)}
           >X</Button>
         )}
       </div>
@@ -61,8 +38,8 @@ export const ListPage: FC = () => {
       <Form.Check
         type="switch"
         label="Only checked (for selectors)"
-        checked={onlyChecked}
-        onChange={() => setOnlyChecked(!onlyChecked)}
+        checked={listPage.onlyChecked}
+        onChange={listPage.toggleOnlyChecked}
       />
       <div className='mt-4 mb-4'>
         {renderItem({
@@ -70,28 +47,13 @@ export const ListPage: FC = () => {
           text: 'Not exists item (for error testing)',
           checked: true,
         })}
-        {filteredItems.map(renderItem)}
+        {listPage.filteredItems.map(renderItem)}
       </div>
       <Button
         style={{ marginRight: 8 }}
-        onClick={() => {
-          const newItem = {
-            id: +new Date(),
-            text: 'New item',
-            checked: false
-          };
-          setItems([...items, newItem]);
-          api.addItem(newItem);
-        }}
+        onClick={listPage.create}
       >Add item</Button>
-      <Button
-        onClick={() => {
-          const hideLoader = loader.show();
-          api.updateItemList(items)
-            .then(fetch)
-            .finally(hideLoader);
-        }}
-      >Save</Button>
+      <Button onClick={listPage.save}>Save</Button>
       <h3 className='mt-5'>Cache invalidation</h3>
       <p>Please check scenario:</p>
       <ul>
@@ -100,15 +62,21 @@ export const ListPage: FC = () => {
         <li>Come back here and check that data will update</li>
       </ul>
       <ConfirmModal
-        show={!!removingItem}
+        show={!!listPage.remove.removingItem}
         title='Remove item'
-        onApply={() => {
-          if (!removingItem) return;
-          setItems(items.filter(({ id }) => id !== removingItem.id));
-          setRemovingItem(null);
-        }}
-        onCancel={() => setRemovingItem(null)}
+        onApply={listPage.remove.end}
+        onCancel={listPage.remove.cancel}
       />
     </Container>
   );
 };
+
+export const ListPage: FC = () => {
+  return (
+    <SWRConfig value={{ provider: () => new Map() }}>
+      <ListPageProvider>
+        <ListPageView/>
+      </ListPageProvider>
+    </SWRConfig>
+  )
+}

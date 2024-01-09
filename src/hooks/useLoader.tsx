@@ -1,4 +1,4 @@
-import {createContext, FC, ReactNode, useContext, useMemo, useState} from "react";
+import {createContext, FC, ReactNode, useContext, useMemo, useRef, useState} from "react";
 import _ from "lodash";
 
 type Hide = () => void;
@@ -24,17 +24,18 @@ type Props = {
 };
 
 export const LoaderProvider: FC<Props> = (props) => {
-  const [ids, setIds] = useState<string[]>([]);
-
-  const isLoading = ids.length > 0;
+  const [isLoading, setIsLoading] = useState(false);
+  const idsRef = useRef<string[]>([]);
 
   const api = useMemo((): Api => {
     return {
       show() {
-        const id = _.uniqueId();
-        setIds((ids) => [...ids, id]);
+        const loaderId = _.uniqueId();
+        idsRef.current.push(loaderId);
+        setIsLoading(true);
         return () => {
-          setIds((ids) => ids.filter((checkingId) => checkingId !== id));
+          idsRef.current = idsRef.current.filter((id) => id !== loaderId);
+          setIsLoading(idsRef.current.length > 0);
         }
       },
       isLoading

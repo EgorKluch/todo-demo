@@ -1,51 +1,20 @@
-import {FC, useCallback, useEffect, useState} from "react";
-import {useNavigate, useParams} from "react-router-dom";
-import {Item} from "../../../types/Item";
-import {api} from "../../../api";
+import {FC} from "react";
 import {Button, Container, Form} from "react-bootstrap";
-import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import {ItemPageProvider, useItemPage} from "./hooks/useItemPage";
+import {SWRConfig} from "swr";
 
-export const ItemPage: FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-
-  const loader = useLoader();
-
-  // Не использовать локальный стейт для демонстрации
-  const [item, setItem] = useState<Item | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    // Специально не передал пропсом
-    // В демо тоже должен лежать отдельно в стейте (не в стейте списка для главной страницы)
-    //    что бы проверить инвалидацию при переходе между страницами
-    api.getItem(Number(id))
-      .then((response) => {
-        if ('error' in response) {
-          setError(response.error);
-          return;
-        }
-
-        setItem(response);
-      })
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
+const ItemPageView: FC = () => {
+  const itemPage = useItemPage();
 
   function renderContent() {
-    if (error) {
+    if (itemPage.error) {
       return (
-        <div style={{ color: 'red' }}>{error}</div>
+        <div style={{ color: 'red' }}>{itemPage.error}</div>
       )
     }
 
-    if (!item) {
+    if (!itemPage.item) {
       return null;
     }
 
@@ -55,15 +24,21 @@ export const ItemPage: FC = () => {
           <Form.Check
             type="checkbox"
             label="Checked"
-            checked={item.checked}
-            onChange={() => setItem({ ...item, checked: !item.checked })}
+            checked={itemPage.item.checked}
+            onChange={() => {
+              if (!itemPage.item) return;
+              itemPage.change({ ...itemPage.item, checked: !itemPage.item.checked })
+            }}
           />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Text</Form.Label>
           <Form.Control
-            value={item.text}
-            onChange={(e) => setItem({ ...item, text: e.target.value })}
+            value={itemPage.item.text}
+            onChange={(e) => {
+              if (!itemPage.item) return;
+              itemPage.change({ ...itemPage.item, text: e.target.value })
+            }}
           />
         </Form.Group>
       </Form>
@@ -77,18 +52,12 @@ export const ItemPage: FC = () => {
       <div>
         <Button
           className='m-1'
-          onClick={() => {
-            if (!item) return;
-            const hideLoader = loader.show();
-            api.updateItem(item)
-              .then(fetch)
-              .finally(hideLoader);
-          }}
+          onClick={itemPage.save}
         >Save</Button>
         <Button
           className='m-1'
           variant='danger'
-          onClick={() => setRemoveConfirmationOpened(true)}
+          onClick={itemPage.remove.start}
         >Remove</Button>
         <Button className='m-1' href='/' variant='secondary'>Back</Button>
       </div>
@@ -100,17 +69,21 @@ export const ItemPage: FC = () => {
         <li>Come back here and check that data will update</li>
       </ul>
       <ConfirmModal
-        show={removeConfirmationOpened}
+        show={itemPage.remove.isRemoving}
         title='Remove item'
-        onApply={() => {
-          if (!item) return;
-          const hideLoader = loader.show();
-          api.removeItem(item.id)
-            .then(() => navigate('/'))
-            .finally(hideLoader);
-        }}
-        onCancel={() => setRemoveConfirmationOpened(false)}
+        onApply={itemPage.remove.end}
+        onCancel={itemPage.remove.cancel}
       />
     </Container>
   )
 };
+
+export const ItemPage: FC = () => {
+  return (
+    <SWRConfig value={{ provider: () => new Map() }}>
+      <ItemPageProvider>
+        <ItemPageView/>
+      </ItemPageProvider>
+    </SWRConfig>
+  )
+}
