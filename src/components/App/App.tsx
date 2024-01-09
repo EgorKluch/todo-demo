@@ -2,10 +2,12 @@ import React from 'react';
 import {
   createBrowserRouter, RouterProvider,
 } from "react-router-dom";
+
+import {QueryClient, QueryClientProvider} from 'react-query';
 import {ListPage} from "../pages/ListPage/ListPage";
 import {ItemPage} from "../pages/ItemPage/ItemPage";
+import { Loader } from '../common/Loader/Loader';
 import {LoaderProvider} from "../../hooks/useLoader";
-import {Loader} from "../common/Loader/Loader";
 
 const router = createBrowserRouter([
   {
@@ -18,12 +20,16 @@ const router = createBrowserRouter([
   }
 ]);
 
+const queryClient = new QueryClient()
+
 function App() {
   return (
-    <LoaderProvider>
-      <RouterProvider router={router}/>
-      <Loader/> {/* Логичней в LoaderProvider вынести - но для тестирования глобального стейта тут ;) */}
-    </LoaderProvider>
+    <QueryClientProvider client={queryClient}>
+       <LoaderProvider>
+        <RouterProvider router={router}/>
+        <Loader/>
+      </LoaderProvider>
+    </QueryClientProvider>
   );
 }
 

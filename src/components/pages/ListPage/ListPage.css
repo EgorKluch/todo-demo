@@ -8,3 +8,7 @@
 .ListPage__link {
     flex: 1;
 }
+
+.ListPage__error {
+    color: red;
+}
