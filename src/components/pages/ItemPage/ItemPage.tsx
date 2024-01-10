@@ -1,47 +1,39 @@
-import {FC, useCallback, useEffect, useState} from "react";
+import {FC, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
-import {Item} from "../../../types/Item";
-import {api} from "../../../api";
+import {ItemType} from "../../../types/Item";
+import {RespErr, api, urls} from "../../../api";
 import {Button, Container, Form} from "react-bootstrap";
 import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import useSWR from "swr";
+import useSWRMutation from "swr/mutation";
+import { useItem, useItemData, useItemOptimistic } from "../../../hooks/useItemData";
+import { useModal } from "../../../hooks/useModal";
 
 export const ItemPage: FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  // const {item, error, update, remove, isLoading, isValidating} = useItem(String(id));
+  const {item, error, update, remove, isLoading, isValidating} = useItemOptimistic(String(id));
 
-  const loader = useLoader();
+  // const {update, remove, isLoading} = useItemData();
+  // const {data: item, isLoading: isLoadingItem, error} = useSWR<ItemType, RespErr>(id, (url: string) => api.getItem(Number(url)))
+  // const { trigger: update, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
+  // const { trigger: remove, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, 
+  //   (url, {arg}: {arg: number}) => api.removeItem(arg)
+  // );
+  // const isLoading = isLoadingItem || isMutatingRemoveItem || isMutatingUpdateItem;
 
-  // Не использовать локальный стейт для демонстрации
-  const [item, setItem] = useState<Item | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
+  useLoader(isLoading || isValidating);
 
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    // Специально не передал пропсом
-    // В демо тоже должен лежать отдельно в стейте (не в стейте списка для главной страницы)
-    //    что бы проверить инвалидацию при переходе между страницами
-    api.getItem(Number(id))
-      .then((response) => {
-        if ('error' in response) {
-          setError(response.error);
-          return;
-        }
+  const [itemDraft, setItemDraft] = useState<ItemType>();
 
-        setItem(response);
-      })
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
+  const {isOpen, open, close} = useModal();
 
   function renderContent() {
     if (error) {
       return (
-        <div style={{ color: 'red' }}>{error}</div>
+        <div style={{ color: 'red' }}>{error.error}</div>
       )
     }
 
@@ -55,15 +47,15 @@ export const ItemPage: FC = () => {
           <Form.Check
             type="checkbox"
             label="Checked"
-            checked={item.checked}
-            onChange={() => setItem({ ...item, checked: !item.checked })}
+            checked={itemDraft? itemDraft.checked : item?.checked}
+            onChange={() => setItemDraft({...item, checked: !item?.checked})}
           />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Text</Form.Label>
           <Form.Control
-            value={item.text}
-            onChange={(e) => setItem({ ...item, text: e.target.value })}
+            value={itemDraft ? itemDraft.text : item.text}
+            onChange={(e) => setItemDraft({ ...item, text: e.target.value })}
           />
         </Form.Group>
       </Form>
@@ -77,18 +69,18 @@ export const ItemPage: FC = () => {
       <div>
         <Button
           className='m-1'
-          onClick={() => {
-            if (!item) return;
-            const hideLoader = loader.show();
-            api.updateItem(item)
-              .then(fetch)
-              .finally(hideLoader);
+          disabled={!itemDraft}
+          onClick={async () => {
+            if (!itemDraft) return;
+            await update(itemDraft);
+            setItemDraft(undefined);
           }}
         >Save</Button>
         <Button
           className='m-1'
           variant='danger'
-          onClick={() => setRemoveConfirmationOpened(true)}
+          disabled={!item}
+          onClick={open}
         >Remove</Button>
         <Button className='m-1' href='/' variant='secondary'>Back</Button>
       </div>
@@ -100,16 +92,15 @@ export const ItemPage: FC = () => {
         <li>Come back here and check that data will update</li>
       </ul>
       <ConfirmModal
-        show={removeConfirmationOpened}
+        show={isOpen}
         title='Remove item'
-        onApply={() => {
+        onApply={async () => {
           if (!item) return;
-          const hideLoader = loader.show();
-          api.removeItem(item.id)
-            .then(() => navigate('/'))
-            .finally(hideLoader);
+          await remove(item.id);
+          close();
+          navigate('/')
         }}
-        onCancel={() => setRemoveConfirmationOpened(false)}
+        onCancel={close}
       />
     </Container>
   )

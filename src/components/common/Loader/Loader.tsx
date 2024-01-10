@@ -1,12 +1,13 @@
 import {FC} from "react";
 import {Spinner} from "react-bootstrap";
 import './Loader.css';
-import {useLoader} from "../../../hooks/useLoader";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
 
 export const Loader: FC = () => {
-  const loader = useLoader();
+  const isLoading = useSelector<RootState>((state) => state.loader.isLoading);
 
-  if (!loader.isLoading) {
+  if (!isLoading) {
     return null;
   }
 

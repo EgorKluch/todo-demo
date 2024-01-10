@@ -1,47 +1,16 @@
-import {createContext, FC, ReactNode, useContext, useMemo, useState} from "react";
+import React from 'react';
 import _ from "lodash";
+import { loaderSlice } from '../components/store/slices/loading';
+import { useDispatch } from 'react-redux';
 
-type Hide = () => void;
+export const useLoader = (isLoading: boolean) => {
+  const dispatch = useDispatch();
+  const id = React.useMemo(() => _.uniqueId(), []);
 
-type Api = {
-  show(): Hide;
-  isLoading: boolean;
+  React.useEffect(() => {
+    dispatch(loaderSlice.actions.setLoading({id, isLoading}))
+    return () => {
+      dispatch(loaderSlice.actions.setLoading({id, isLoading: false}))
+    }
+  }, [id, dispatch, isLoading])
 }
-
-const loaderContext = createContext<Api | null>(null);
-const { Provider } = loaderContext;
-
-export function useLoader() {
-  const api = useContext(loaderContext);
-
-  if (!api) throw new Error('Please, use LoaderProvider');
-
-  return api;
-}
-
-type Props = {
-  children: ReactNode
-};
-
-export const LoaderProvider: FC<Props> = (props) => {
-  const [ids, setIds] = useState<string[]>([]);
-
-  const isLoading = ids.length > 0;
-
-  const api = useMemo((): Api => {
-    return {
-      show() {
-        const id = _.uniqueId();
-        setIds((ids) => [...ids, id]);
-        return () => {
-          setIds((ids) => ids.filter((checkingId) => checkingId !== id));
-        }
-      },
-      isLoading
-    };
-  }, [isLoading]);
-
-  return (
-    <Provider value={api}>{props.children}</Provider>
-  )
-};
