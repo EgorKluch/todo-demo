@@ -1,47 +1,32 @@
-import {FC, useCallback, useEffect, useState} from "react";
+import React, {FC, useEffect, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
-import {Item} from "../../../types/Item";
-import {api} from "../../../api";
 import {Button, Container, Form} from "react-bootstrap";
-import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import { itemDeleted, removeItem, resetItemDraft, saveItemDraft, setItemDraft, useItem } from '../../../state/items/item';
 
 export const ItemPage: FC = () => {
   const { id } = useParams<{ id: string }>();
+  const numId = Number(id);
   const navigate = useNavigate();
 
-  const loader = useLoader();
-
   // Не использовать локальный стейт для демонстрации
-  const [item, setItem] = useState<Item | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const {data: item, loadingStatus} = useItem(numId);
   const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
 
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    // Специально не передал пропсом
-    // В демо тоже должен лежать отдельно в стейте (не в стейте списка для главной страницы)
-    //    что бы проверить инвалидацию при переходе между страницами
-    api.getItem(Number(id))
-      .then((response) => {
-        if ('error' in response) {
-          setError(response.error);
-          return;
-        }
-
-        setItem(response);
-      })
-      .finally(hideLoader);
-  }, []);
+  useEffect(() => {
+    return resetItemDraft;
+  }, [id]);
 
   useEffect(() => {
-    fetch();
-  }, []);
+    itemDeleted.watch(() => {
+      navigate('/')
+    });
+  }, [navigate]);
 
   function renderContent() {
-    if (error) {
+    if (loadingStatus === 'error') {
       return (
-        <div style={{ color: 'red' }}>{error}</div>
+        <div style={{ color: 'red' }}>{loadingStatus}</div>
       )
     }
 
@@ -56,14 +41,14 @@ export const ItemPage: FC = () => {
             type="checkbox"
             label="Checked"
             checked={item.checked}
-            onChange={() => setItem({ ...item, checked: !item.checked })}
+            onChange={() => setItemDraft({ ...item, checked: !item.checked })}
           />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Text</Form.Label>
           <Form.Control
             value={item.text}
-            onChange={(e) => setItem({ ...item, text: e.target.value })}
+            onChange={(e) => setItemDraft({ ...item, text: e.target.value })}
           />
         </Form.Group>
       </Form>
@@ -79,10 +64,7 @@ export const ItemPage: FC = () => {
           className='m-1'
           onClick={() => {
             if (!item) return;
-            const hideLoader = loader.show();
-            api.updateItem(item)
-              .then(fetch)
-              .finally(hideLoader);
+            saveItemDraft();
           }}
         >Save</Button>
         <Button
@@ -104,10 +86,7 @@ export const ItemPage: FC = () => {
         title='Remove item'
         onApply={() => {
           if (!item) return;
-          const hideLoader = loader.show();
-          api.removeItem(item.id)
-            .then(() => navigate('/'))
-            .finally(hideLoader);
+          removeItem(numId);
         }}
         onCancel={() => setRemoveConfirmationOpened(false)}
       />

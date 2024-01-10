@@ -1,35 +1,22 @@
-import {FC, useCallback, useEffect, useMemo, useState} from "react";
+import React, {FC, useMemo, useState} from "react";
 import {Button, Container, Form} from "react-bootstrap";
-import {api} from "../../../api";
 import {Item, Item as ItemType} from '../../../types/Item';
 import './ListPage.css';
-import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import { saveItems, useItems } from '../../../state/items/items';
+import { addItem, checkItem, localRemoveItem } from '../../../state/items/item';
 
 export const ListPage: FC = () => {
-  const loader = useLoader();
-
-  // Не использовать локальный стейт для демонстрации
-  const [items, setItems] = useState<ItemType[]>([]);
   const [onlyChecked, setOnlyChecked] = useState(false);
   const [removingItem, setRemovingItem] = useState<ItemType | null>(null);
+
+  const {data: items} = useItems()
 
   // Для демонстрации аля селекторов добавил фильтрацию
   const filteredItems = useMemo(() => {
     if (!onlyChecked) return items;
     return items.filter((item) => item.checked);
   }, [items, onlyChecked]);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    api.getItemList()
-      .then((items) => setItems(items))
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
 
   function renderItem(item: Item) {
     return (
@@ -39,8 +26,7 @@ export const ListPage: FC = () => {
           checked={item.checked}
           onChange={() => {
             if (!item.id) return;
-            const newItem = {...item, checked: !item.checked};
-            setItems(items.map((item) => item.id === newItem.id ? newItem : item));
+            checkItem(item.id);
           }}
         />
         <div className='ListPage__link'><a href={`item/${item.id}`}>{item.text}</a></div>
@@ -80,16 +66,12 @@ export const ListPage: FC = () => {
             text: 'New item',
             checked: false
           };
-          setItems([...items, newItem]);
-          api.addItem(newItem);
+          addItem(newItem);
         }}
       >Add item</Button>
       <Button
         onClick={() => {
-          const hideLoader = loader.show();
-          api.updateItemList(items)
-            .then(fetch)
-            .finally(hideLoader);
+          saveItems();
         }}
       >Save</Button>
       <h3 className='mt-5'>Cache invalidation</h3>
@@ -104,7 +86,7 @@ export const ListPage: FC = () => {
         title='Remove item'
         onApply={() => {
           if (!removingItem) return;
-          setItems(items.filter(({ id }) => id !== removingItem.id));
+          localRemoveItem(removingItem.id);
           setRemovingItem(null);
         }}
         onCancel={() => setRemovingItem(null)}
