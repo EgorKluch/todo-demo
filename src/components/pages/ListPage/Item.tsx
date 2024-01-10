@@ -1,11 +1,12 @@
 import React, {FC} from "react";
-import { ItemType as ItemType } from '../../../types/Item';
+import { ItemType } from '../../../types/Item';
 import {Button, Form} from "react-bootstrap";
 import {api, urls} from "../../../api";
 import useSWRMutation from 'swr/mutation';
 import { useLoader } from "../../../hooks/useLoader";
 import { ConfirmModal } from "../../common/ConfirmModal/ConfirmModal";
 import { useItem, useItemData } from "../../../hooks/useItemData";
+import { useModal } from "../../../hooks/useModal";
 
 type Props = {
   item: ItemType,
@@ -15,8 +16,8 @@ type Props = {
 
 export const Item: FC<Props> = (props) => {
   const { item } = props;
-  const [isOpenModal, setIsOpenModal] = React.useState(false);
   const {update, remove, isLoading} = useItem(String(item.id));
+  const {isOpen, open, close} = useModal();
   
   // const {update, remove, isLoading} = useItemData();
   // const { trigger: update, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
@@ -40,18 +41,18 @@ export const Item: FC<Props> = (props) => {
           <Button
             variant="outline-secondary"
             size='sm'
-            onClick={() => setIsOpenModal(true)}
+            onClick={open}
           >X</Button>
         )}
       </div>
       <ConfirmModal
-        show={isOpenModal}
+        show={isOpen}
         title='Remove item'
         onApply={() => {
           remove(item.id)
-          setIsOpenModal(false);
+          close()
         }}
-        onCancel={() => setIsOpenModal(false)}
+        onCancel={close}
       />
     </>
   )
