@@ -5,6 +5,7 @@ import {api, urls} from "../../../api";
 import useSWRMutation from 'swr/mutation';
 import { useLoader } from "../../../hooks/useLoader";
 import { ConfirmModal } from "../../common/ConfirmModal/ConfirmModal";
+import { useItem, useItemData } from "../../../hooks/useItemData";
 
 type Props = {
   item: ItemType,
@@ -14,12 +15,15 @@ type Props = {
 
 export const Item: FC<Props> = (props) => {
   const { item } = props;
-  const { trigger: updateItemTrigger, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
-  const { trigger: removeItemTrigger, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, (url, {arg}: {arg: number}) => api.removeItem(arg))
-
   const [isOpenModal, setIsOpenModal] = React.useState(false);
+  const {update, remove, isLoading} = useItem(String(item.id));
+  
+  // const {update, remove, isLoading} = useItemData();
+  // const { trigger: update, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
+  // const { trigger: remove, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, (url, {arg}: {arg: number}) => api.removeItem(arg))
+  // const isLoading = isMutatingRemoveItem || isMutatingUpdateItem;
 
-  useLoader(isMutatingRemoveItem || isMutatingUpdateItem);
+  useLoader(isLoading);
 
   return (
     <>
@@ -28,7 +32,7 @@ export const Item: FC<Props> = (props) => {
           className='m-2'
           checked={item.checked}
           onChange={() => {
-            updateItemTrigger?.({...item, checked: !item.checked})
+            update?.({...item, checked: !item.checked})
           }}
         />
         <div className='ListPage__link'><a href={`item/${item.id}`}>{item.text}</a></div>
@@ -44,7 +48,7 @@ export const Item: FC<Props> = (props) => {
         show={isOpenModal}
         title='Remove item'
         onApply={() => {
-          removeItemTrigger(item.id)
+          remove(item.id)
           setIsOpenModal(false);
         }}
         onCancel={() => setIsOpenModal(false)}

@@ -7,11 +7,15 @@ import {useLoader} from "../../../hooks/useLoader";
 import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { Item } from "./Item";
+import { useItems } from "../../../hooks/useItemData";
 
 const AddItemButton = () => {
-  const { trigger, isMutating } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.addItem(arg))
-  
+  // const {add, isLoading} = useItems();
+  // useLoader(isLoading)
+
+  const { trigger: add, isMutating } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.addItem(arg))
   useLoader(isMutating);
+
   
   return (
     <Button
@@ -22,13 +26,14 @@ const AddItemButton = () => {
           text: 'New item',
           checked: false
         };
-        trigger(newItem);
+        add(newItem);
       }}
     >Add item</Button>
   )
 }
 
 export const ListPage: FC = () => {
+  // const {items, isLoading } = useItems();
   const {data: items = [], isLoading} = useSWR(urls.item, (url) => api.getItemList());
   
   useLoader(isLoading);

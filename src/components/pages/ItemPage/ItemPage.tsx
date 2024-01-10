@@ -7,17 +7,23 @@ import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
+import { useItem, useItemData } from "../../../hooks/useItemData";
 
 export const ItemPage: FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {data: item, isLoading, error} = useSWR<ItemType, RespErr>(id, (url: string) => api.getItem(Number(url)))
-  const { trigger: updateItemTrigger, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
-  const { trigger: removeItemTrigger, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, 
-    (url, {arg}: {arg: number}) => api.removeItem(arg).then(() => navigate('/'))
-  );
+  const {item, error, update, remove, isLoading, isValidating} = useItem(String(id));
 
-  useLoader(isLoading || isMutatingRemoveItem || isMutatingUpdateItem);
+  // const {data: item, isLoading: isLoadingItem, error} = useSWR<ItemType, RespErr>(id, (url: string) => api.getItem(Number(url)))
+  // const {update, remove, isLoading} = useItemData();
+  // const { trigger: update, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
+  // const { trigger: remove, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, 
+  //   (url, {arg}: {arg: number}) => api.removeItem(arg)
+  // );
+  // const isLoading = isLoadingItem || isMutatingRemoveItem || isMutatingUpdateItem;
+
+  console.log(item, isLoading, isValidating)
+  useLoader(isLoading || isValidating);
 
   const [itemDraft, setItemDraft] = useState<ItemType>();
 
@@ -63,9 +69,10 @@ export const ItemPage: FC = () => {
         <Button
           className='m-1'
           disabled={!itemDraft}
-          onClick={() => {
+          onClick={async () => {
             if (!itemDraft) return;
-            updateItemTrigger(itemDraft);
+            await update(itemDraft);
+            setItemDraft(undefined);
           }}
         >Save</Button>
         <Button
@@ -86,9 +93,10 @@ export const ItemPage: FC = () => {
       <ConfirmModal
         show={removeConfirmationOpened}
         title='Remove item'
-        onApply={() => {
+        onApply={async () => {
           if (!item) return;
-          removeItemTrigger(item.id);
+          await remove(item.id);
+          navigate('/')
         }}
         onCancel={() => setRemoveConfirmationOpened(false)}
       />
