@@ -38,6 +38,48 @@ export const useItem = (id: string) => {
     }
 }
 
+export const useItemOptimistic = (id: string) => {
+    const url = `${urls.item}/${id}`;
+    const { mutate } = useSWRConfig()
+
+    const {data: item, isLoading: isLoadingItems, error, isValidating} = useSWR<ItemType, RespErr>(
+        url,
+        (url: string) => api.getItem(Number(id)),
+        {shouldRetryOnError: false}
+    )
+    const { trigger: updateItemTrigger, isMutating: isMutatingUpdateItem } = useSWRMutation(
+        url,
+        (url, {arg}: {arg: ItemType}) => api.updateItem(arg),
+        {onSuccess: () => mutate(urls.item)},
+    );
+    const { trigger: removeItemTrigger, isMutating: isMutatingRemoveItem } = useSWRMutation(
+        url,
+        (url, {arg}: {arg: number}) => api.removeItem(arg),
+        {onSuccess: () => mutate(urls.item)}
+    );
+
+    const isLoading = React.useMemo(
+        () => isMutatingUpdateItem || isMutatingRemoveItem || isLoadingItems,
+        [isMutatingUpdateItem, isMutatingRemoveItem, isLoadingItems]
+    )
+
+    const update = (newItem: ItemType) => {
+        updateItemTrigger<ItemType>(newItem, {
+            optimisticData: item => ({ ...item, ...newItem }),
+            rollbackOnError: true,
+          });
+    }
+
+    return {
+        item,
+        isLoading,
+        error,
+        isValidating,
+        update,
+        remove: removeItemTrigger,
+    }
+}
+
 // example for same url
 export const useItems = () => {
     const {data: items = [], isLoading: isLoadingItems} = useSWR(urls.item, (url) => api.getItemList());
@@ -55,7 +97,7 @@ export const useItems = () => {
     }
 }
 
-// example for same for POST, DELETE actions
+// example url same for POST, DELETE actions
 export const useItemData = () => {
     const { trigger: addItemTrigger, isMutating: isMutatingAddItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.addItem(arg))
     const { trigger: updateItemTrigger, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))

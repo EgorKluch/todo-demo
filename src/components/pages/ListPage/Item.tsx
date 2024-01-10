@@ -19,7 +19,6 @@ export const Item: FC<Props> = (props) => {
   const {update, remove, isLoading} = useItem(String(item.id));
   const {isOpen, open, close} = useModal();
   
-  // const {update, remove, isLoading} = useItemData();
   // const { trigger: update, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
   // const { trigger: remove, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, (url, {arg}: {arg: number}) => api.removeItem(arg))
   // const isLoading = isMutatingRemoveItem || isMutatingUpdateItem;

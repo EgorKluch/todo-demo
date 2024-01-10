@@ -7,27 +7,28 @@ import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
 import useSWR from "swr";
 import useSWRMutation from "swr/mutation";
-import { useItem, useItemData } from "../../../hooks/useItemData";
+import { useItem, useItemData, useItemOptimistic } from "../../../hooks/useItemData";
+import { useModal } from "../../../hooks/useModal";
 
 export const ItemPage: FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {item, error, update, remove, isLoading, isValidating} = useItem(String(id));
+  // const {item, error, update, remove, isLoading, isValidating} = useItem(String(id));
+  const {item, error, update, remove, isLoading, isValidating} = useItemOptimistic(String(id));
 
-  // const {data: item, isLoading: isLoadingItem, error} = useSWR<ItemType, RespErr>(id, (url: string) => api.getItem(Number(url)))
   // const {update, remove, isLoading} = useItemData();
+  // const {data: item, isLoading: isLoadingItem, error} = useSWR<ItemType, RespErr>(id, (url: string) => api.getItem(Number(url)))
   // const { trigger: update, isMutating: isMutatingUpdateItem } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.updateItem(arg))
   // const { trigger: remove, isMutating: isMutatingRemoveItem } = useSWRMutation(urls.item, 
   //   (url, {arg}: {arg: number}) => api.removeItem(arg)
   // );
   // const isLoading = isLoadingItem || isMutatingRemoveItem || isMutatingUpdateItem;
 
-  console.log(item, isLoading, isValidating)
   useLoader(isLoading || isValidating);
 
   const [itemDraft, setItemDraft] = useState<ItemType>();
 
-  const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
+  const {isOpen, open, close} = useModal();
 
   function renderContent() {
     if (error) {
@@ -79,7 +80,7 @@ export const ItemPage: FC = () => {
           className='m-1'
           variant='danger'
           disabled={!item}
-          onClick={() => setRemoveConfirmationOpened(true)}
+          onClick={open}
         >Remove</Button>
         <Button className='m-1' href='/' variant='secondary'>Back</Button>
       </div>
@@ -91,14 +92,15 @@ export const ItemPage: FC = () => {
         <li>Come back here and check that data will update</li>
       </ul>
       <ConfirmModal
-        show={removeConfirmationOpened}
+        show={isOpen}
         title='Remove item'
         onApply={async () => {
           if (!item) return;
           await remove(item.id);
+          close();
           navigate('/')
         }}
-        onCancel={() => setRemoveConfirmationOpened(false)}
+        onCancel={close}
       />
     </Container>
   )

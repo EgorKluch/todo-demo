@@ -10,13 +10,9 @@ import { Item } from "./Item";
 import { useItems } from "../../../hooks/useItemData";
 
 const AddItemButton = () => {
-  // const {add, isLoading} = useItems();
-  // useLoader(isLoading)
-
   const { trigger: add, isMutating } = useSWRMutation(urls.item, (url, {arg}: {arg: ItemType}) => api.addItem(arg))
   useLoader(isMutating);
 
-  
   return (
     <Button
       style={{ marginRight: 8 }}
@@ -33,7 +29,6 @@ const AddItemButton = () => {
 }
 
 export const ListPage: FC = () => {
-  // const {items, isLoading } = useItems();
   const {data: items = [], isLoading} = useSWR(urls.item, (url) => api.getItemList());
   
   useLoader(isLoading);
