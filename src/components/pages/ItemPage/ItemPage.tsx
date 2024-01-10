@@ -1,42 +1,39 @@
-import {FC, useCallback, useEffect, useState} from "react";
+import {useEffect, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
-import {Item} from "../../../types/Item";
 import {api} from "../../../api";
 import {Button, Container, Form} from "react-bootstrap";
-import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import { useMutation, useQuery } from "react-query";
+import { Item } from "../../../types/Item";
+import { useLoader } from "../../../hooks/useLoader";
 
-export const ItemPage: FC = () => {
+type ItemResponseError = {error: string};
+
+function isErrorItem(data: Item | ItemResponseError | undefined): data is ItemResponseError  {
+  return Boolean(data && 'error' in data);
+}
+
+export const ItemPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-
   const loader = useLoader();
 
-  // Не использовать локальный стейт для демонстрации
   const [item, setItem] = useState<Item | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
 
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    // Специально не передал пропсом
-    // В демо тоже должен лежать отдельно в стейте (не в стейте списка для главной страницы)
-    //    что бы проверить инвалидацию при переходе между страницами
-    api.getItem(Number(id))
-      .then((response) => {
-        if ('error' in response) {
-          setError(response.error);
-          return;
-        }
-
-        setItem(response);
-      })
-      .finally(hideLoader);
-  }, []);
+  //react-query
+  const {data, refetch, isError: isItemError} = useQuery('item', () => api.getItem(Number(id)));
+  const {mutate: updateItem} = useMutation(api.updateItem)
+  const {mutate: removeItem} = useMutation(api.removeItem)
 
   useEffect(() => {
-    fetch();
-  }, []);
+    if(isItemError || isErrorItem(data)) {
+      setError((data as ItemResponseError)?.error || 'Item data loading error');
+    } else if(data) {
+      setItem(data)
+    }
+  },[data, isItemError])
 
   function renderContent() {
     if (error) {
@@ -79,10 +76,13 @@ export const ItemPage: FC = () => {
           className='m-1'
           onClick={() => {
             if (!item) return;
+
             const hideLoader = loader.show();
-            api.updateItem(item)
-              .then(fetch)
-              .finally(hideLoader);
+
+            updateItem(item, {
+              onSuccess: () => refetch(),
+              onSettled: hideLoader
+            })
           }}
         >Save</Button>
         <Button
@@ -103,11 +103,13 @@ export const ItemPage: FC = () => {
         show={removeConfirmationOpened}
         title='Remove item'
         onApply={() => {
-          if (!item) return;
+          if (!item || 'error' in item) return;
           const hideLoader = loader.show();
-          api.removeItem(item.id)
-            .then(() => navigate('/'))
-            .finally(hideLoader);
+
+          removeItem(item.id, {
+            onSuccess: () => navigate('/'),
+            onSettled: hideLoader
+          })
         }}
         onCancel={() => setRemoveConfirmationOpened(false)}
       />

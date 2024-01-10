@@ -1,35 +1,38 @@
-import {FC, useCallback, useEffect, useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {Button, Container, Form} from "react-bootstrap";
+import { useMutation, useQuery } from "react-query";
 import {api} from "../../../api";
 import {Item, Item as ItemType} from '../../../types/Item';
-import './ListPage.css';
-import {useLoader} from "../../../hooks/useLoader";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import {useLoader} from "../../../hooks/useLoader";
 
-export const ListPage: FC = () => {
-  const loader = useLoader();
+import './ListPage.css';
 
-  // Не использовать локальный стейт для демонстрации
-  const [items, setItems] = useState<ItemType[]>([]);
+const createItem = ()=> ({
+  id: +new Date(),
+  text: 'New item',
+  checked: false
+});
+
+export const ListPage = () => {
   const [onlyChecked, setOnlyChecked] = useState(false);
   const [removingItem, setRemovingItem] = useState<ItemType | null>(null);
+  const loader = useLoader();
 
-  // Для демонстрации аля селекторов добавил фильтрацию
-  const filteredItems = useMemo(() => {
-    if (!onlyChecked) return items;
-    return items.filter((item) => item.checked);
-  }, [items, onlyChecked]);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    api.getItemList()
-      .then((items) => setItems(items))
-      .finally(hideLoader);
-  }, []);
+  // react-query
+  const {data: items = [], refetch, isFetching: isItemsFetching, isError: isItemsError} = useQuery('items', api.getItemList);
+  const {mutate: updateItem, isLoading: isItemUpdating} = useMutation(api.updateItem, {onSuccess: () => refetch()})
+  const {mutate: updateItems, isLoading: isItemsUpdating} = useMutation(api.updateItemList, {onSuccess: () => refetch()})
 
   useEffect(() => {
-    fetch();
-  }, []);
+    if(isItemsFetching || isItemUpdating || isItemsUpdating) {
+      return loader.show()}
+  },[isItemsFetching, isItemUpdating, isItemsUpdating, loader]);
+  
+  const filteredItems = useMemo(() => {
+    if (!onlyChecked) return items;
+    return items?.filter((item) => item.checked);
+  }, [items, onlyChecked]);
 
   function renderItem(item: Item) {
     return (
@@ -38,9 +41,9 @@ export const ListPage: FC = () => {
           className='m-2'
           checked={item.checked}
           onChange={() => {
-            if (!item.id) return;
-            const newItem = {...item, checked: !item.checked};
-            setItems(items.map((item) => item.id === newItem.id ? newItem : item));
+            if(item.id) {
+              updateItem({...item, checked: !item.checked});
+            }
           }}
         />
         <div className='ListPage__link'><a href={`item/${item.id}`}>{item.text}</a></div>
@@ -54,7 +57,7 @@ export const ListPage: FC = () => {
       </div>
     );
   }
-
+  
   return (
     <Container className='mt-3' style={{ width: 800 }}>
       <h1 className='mb-4'>Items list</h1>
@@ -70,28 +73,15 @@ export const ListPage: FC = () => {
           text: 'Not exists item (for error testing)',
           checked: true,
         })}
-        {filteredItems.map(renderItem)}
+        {filteredItems?.map(renderItem)}
+        {isItemsError && <p className="ListPage__error">Fetching items error</p>}
       </div>
       <Button
         style={{ marginRight: 8 }}
         onClick={() => {
-          const newItem = {
-            id: +new Date(),
-            text: 'New item',
-            checked: false
-          };
-          setItems([...items, newItem]);
-          api.addItem(newItem);
+          updateItems([...items, createItem()]);
         }}
       >Add item</Button>
-      <Button
-        onClick={() => {
-          const hideLoader = loader.show();
-          api.updateItemList(items)
-            .then(fetch)
-            .finally(hideLoader);
-        }}
-      >Save</Button>
       <h3 className='mt-5'>Cache invalidation</h3>
       <p>Please check scenario:</p>
       <ul>
@@ -104,8 +94,11 @@ export const ListPage: FC = () => {
         title='Remove item'
         onApply={() => {
           if (!removingItem) return;
-          setItems(items.filter(({ id }) => id !== removingItem.id));
-          setRemovingItem(null);
+          updateItems(items.filter(({ id }) => id !== removingItem.id), {
+            onSuccess:() => {
+              setRemovingItem(null);
+            }
+          })
         }}
         onCancel={() => setRemovingItem(null)}
       />
