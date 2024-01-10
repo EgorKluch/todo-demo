@@ -1,12 +1,12 @@
-import {FC} from "react";
+import React, {FC} from "react";
 import {Spinner} from "react-bootstrap";
 import './Loader.css';
-import {useLoader} from "../../../hooks/useLoader";
+import { useLoader } from '../../../state/loader';
 
 export const Loader: FC = () => {
-  const loader = useLoader();
+  const isLoading = useLoader();
 
-  if (!loader.isLoading) {
+  if (!isLoading) {
     return null;
   }
 
