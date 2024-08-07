@@ -1,73 +1,63 @@
-import {FC, useCallback, useEffect, useMemo, useState} from "react";
-import {Button, Container, Form} from "react-bootstrap";
-import {api} from "../../../api";
-import {Item, Item as ItemType} from '../../../types/Item';
-import './ListPage.css';
-import {useLoader} from "../../../hooks/useLoader";
-import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import { FC, useState } from "react";
+import { Button, Container, Form } from "react-bootstrap";
+import { Item, Item as ItemType } from "../../../types/Item";
+import "./ListPage.css";
+import { ConfirmModal } from "../../common/ConfirmModal/ConfirmModal";
+import { useSnapshot } from "valtio";
+import {
+  addItem,
+  removeItem,
+  setOnlyChecked,
+  todoStore,
+  updateItem,
+} from "../../../valtioState";
 
 export const ListPage: FC = () => {
-  const loader = useLoader();
+  const { onlyChecked, filteredTodoList: filteredItems } =
+    useSnapshot(todoStore);
 
-  // Не использовать локальный стейт для демонстрации
-  const [items, setItems] = useState<ItemType[]>([]);
-  const [onlyChecked, setOnlyChecked] = useState(false);
   const [removingItem, setRemovingItem] = useState<ItemType | null>(null);
-
-  // Для демонстрации аля селекторов добавил фильтрацию
-  const filteredItems = useMemo(() => {
-    if (!onlyChecked) return items;
-    return items.filter((item) => item.checked);
-  }, [items, onlyChecked]);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    api.getItemList()
-      .then((items) => setItems(items))
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
 
   function renderItem(item: Item) {
     return (
-      <div className='ListPage__item mb-2' key={item.id}>
+      <div className="ListPage__item mb-2" key={item.id}>
         <Form.Check
-          className='m-2'
+          className="m-2"
           checked={item.checked}
           onChange={() => {
             if (!item.id) return;
-            const newItem = {...item, checked: !item.checked};
-            setItems(items.map((item) => item.id === newItem.id ? newItem : item));
+            updateItem(item.id, { checked: !item.checked });
           }}
         />
-        <div className='ListPage__link'><a href={`item/${item.id}`}>{item.text}</a></div>
+        <div className="ListPage__link">
+          <a href={`item/${item.id}`}>{item.text}</a>
+        </div>
         {item.id === 0 ? null : (
           <Button
             variant="outline-secondary"
-            size='sm'
+            size="sm"
             onClick={() => setRemovingItem(item)}
-          >X</Button>
+          >
+            X
+          </Button>
         )}
       </div>
     );
   }
 
   return (
-    <Container className='mt-3' style={{ width: 800 }}>
-      <h1 className='mb-4'>Items list</h1>
+    <Container className="mt-3" style={{ width: 800 }}>
+      <h1 className="mb-4">Items list</h1>
       <Form.Check
         type="switch"
         label="Only checked (for selectors)"
         checked={onlyChecked}
         onChange={() => setOnlyChecked(!onlyChecked)}
       />
-      <div className='mt-4 mb-4'>
+      <div className="mt-4 mb-4">
         {renderItem({
           id: 0,
-          text: 'Not exists item (for error testing)',
+          text: "Not exists item (for error testing)",
           checked: true,
         })}
         {filteredItems.map(renderItem)}
@@ -77,22 +67,15 @@ export const ListPage: FC = () => {
         onClick={() => {
           const newItem = {
             id: +new Date(),
-            text: 'New item',
-            checked: false
+            text: "New item",
+            checked: false,
           };
-          setItems([...items, newItem]);
-          api.addItem(newItem);
+          addItem(newItem);
         }}
-      >Add item</Button>
-      <Button
-        onClick={() => {
-          const hideLoader = loader.show();
-          api.updateItemList(items)
-            .then(fetch)
-            .finally(hideLoader);
-        }}
-      >Save</Button>
-      <h3 className='mt-5'>Cache invalidation</h3>
+      >
+        Add item
+      </Button>
+      <h3 className="mt-5">Cache invalidation</h3>
       <p>Please check scenario:</p>
       <ul>
         <li>Go to any item page</li>
@@ -101,10 +84,10 @@ export const ListPage: FC = () => {
       </ul>
       <ConfirmModal
         show={!!removingItem}
-        title='Remove item'
+        title="Remove item"
         onApply={() => {
           if (!removingItem) return;
-          setItems(items.filter(({ id }) => id !== removingItem.id));
+          removeItem(removingItem.id);
           setRemovingItem(null);
         }}
         onCancel={() => setRemovingItem(null)}
