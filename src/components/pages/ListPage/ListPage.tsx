@@ -3,35 +3,32 @@ import {Button, Container, Form} from "react-bootstrap";
 import {api} from "../../../api";
 import {Item, Item as ItemType} from '../../../types/Item';
 import './ListPage.css';
-import {useLoader} from "../../../hooks/useLoader";
+import {useLoaderModel} from "../../../hooks/useLoaderModel";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import {observer} from "mobx-react-lite";
+import {useQuery} from "@tanstack/react-query";
+import {ItemListModel} from "../../../models/ItemListModel";
+import {ItemModel} from "../../../models/ItemModel";
 
-export const ListPage: FC = () => {
-  const loader = useLoader();
+type ViewProps = {
+  itemListModel: ItemListModel,
+  refetch(): void,
+  hasError: boolean
+}
 
-  // Не использовать локальный стейт для демонстрации
-  const [items, setItems] = useState<ItemType[]>([]);
-  const [onlyChecked, setOnlyChecked] = useState(false);
-  const [removingItem, setRemovingItem] = useState<ItemType | null>(null);
+const notExistsItem = new ItemModel({
+  item: {
+    id: 0,
+    text: 'Not exists item (for error testing)',
+    checked: true,
+  },
+});
 
-  // Для демонстрации аля селекторов добавил фильтрацию
-  const filteredItems = useMemo(() => {
-    if (!onlyChecked) return items;
-    return items.filter((item) => item.checked);
-  }, [items, onlyChecked]);
+const ListPageView: FC<ViewProps> = observer((props) => {
+  const { itemListModel } = props;
+  const loader = useLoaderModel();
 
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    api.getItemList()
-      .then((items) => setItems(items))
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
-
-  function renderItem(item: Item) {
+  function renderItem(item: ItemModel) {
     return (
       <div className='ListPage__item mb-2' key={item.id}>
         <Form.Check
@@ -39,8 +36,7 @@ export const ListPage: FC = () => {
           checked={item.checked}
           onChange={() => {
             if (!item.id) return;
-            const newItem = {...item, checked: !item.checked};
-            setItems(items.map((item) => item.id === newItem.id ? newItem : item));
+            item.toggle();
           }}
         />
         <div className='ListPage__link'><a href={`item/${item.id}`}>{item.text}</a></div>
@@ -48,7 +44,7 @@ export const ListPage: FC = () => {
           <Button
             variant="outline-secondary"
             size='sm'
-            onClick={() => setRemovingItem(item)}
+            onClick={() => itemListModel.startRemoving(item.id)}
           >X</Button>
         )}
       </div>
@@ -61,16 +57,13 @@ export const ListPage: FC = () => {
       <Form.Check
         type="switch"
         label="Only checked (for selectors)"
-        checked={onlyChecked}
-        onChange={() => setOnlyChecked(!onlyChecked)}
+        checked={itemListModel.onlyChecked}
+        onChange={() => itemListModel.toggleOnlyChecked()}
       />
       <div className='mt-4 mb-4'>
-        {renderItem({
-          id: 0,
-          text: 'Not exists item (for error testing)',
-          checked: true,
-        })}
-        {filteredItems.map(renderItem)}
+        {renderItem(notExistsItem)}
+        {itemListModel.filteredList.map(renderItem)}
+        {props.hasError && <p className="ListPage__error">Fetching items error</p>}
       </div>
       <Button
         style={{ marginRight: 8 }}
@@ -80,15 +73,15 @@ export const ListPage: FC = () => {
             text: 'New item',
             checked: false
           };
-          setItems([...items, newItem]);
+          itemListModel.add(newItem);
           api.addItem(newItem);
         }}
       >Add item</Button>
       <Button
         onClick={() => {
           const hideLoader = loader.show();
-          api.updateItemList(items)
-            .then(fetch)
+          api.updateItemList(itemListModel.toJs())
+            .then(props.refetch)
             .finally(hideLoader);
         }}
       >Save</Button>
@@ -100,15 +93,40 @@ export const ListPage: FC = () => {
         <li>Come back here and check that data will update</li>
       </ul>
       <ConfirmModal
-        show={!!removingItem}
+        show={!!itemListModel.removingId}
         title='Remove item'
         onApply={() => {
-          if (!removingItem) return;
-          setItems(items.filter(({ id }) => id !== removingItem.id));
-          setRemovingItem(null);
+          if (!itemListModel.removingId) return;
+          itemListModel.confirmRemoving();
         }}
-        onCancel={() => setRemovingItem(null)}
+        onCancel={() => itemListModel.cancelRemoving()}
       />
     </Container>
   );
-};
+});
+
+export const ListPage: FC = observer(() => {
+  const loader = useLoaderModel();
+  const {data: items, refetch, isFetching, isError} = useQuery({
+    queryKey: ['items'],
+    queryFn: api.getItemList,
+  });
+
+  useEffect(() => {
+    if(isFetching) {
+      return loader.show()
+    }
+  },[isFetching, loader]);
+
+  const itemListModel = useMemo(() => {
+    return new ItemListModel({ items: items || [] });
+  }, [items]);
+
+  return (
+    <ListPageView
+      itemListModel={itemListModel}
+      refetch={refetch}
+      hasError={isError}
+    />
+  )
+})

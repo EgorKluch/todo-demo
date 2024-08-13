@@ -1,10 +1,11 @@
 import {FC} from "react";
 import {Spinner} from "react-bootstrap";
 import './Loader.css';
-import {useLoader} from "../../../hooks/useLoader";
+import {useLoaderModel} from "../../../hooks/useLoaderModel";
+import {observer} from "mobx-react-lite";
 
-export const Loader: FC = () => {
-  const loader = useLoader();
+export const Loader: FC = observer(() => {
+  const loader = useLoaderModel();
 
   if (!loader.isLoading) {
     return null;
@@ -17,4 +18,4 @@ export const Loader: FC = () => {
       </Spinner>
     </div>
   )
-}
+})

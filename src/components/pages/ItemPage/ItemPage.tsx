@@ -1,94 +1,65 @@
-import {FC, useCallback, useEffect, useState} from "react";
+import {FC, useEffect, useState} from "react";
 import {useNavigate, useParams} from "react-router-dom";
 import {Item} from "../../../types/Item";
 import {api} from "../../../api";
 import {Button, Container, Form} from "react-bootstrap";
-import {useLoader} from "../../../hooks/useLoader";
+import {useLoaderModel} from "../../../hooks/useLoaderModel";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
+import {observer} from "mobx-react-lite";
+import {ItemModel} from "../../../models/ItemModel";
+import {useQuery} from "@tanstack/react-query";
 
-export const ItemPage: FC = () => {
-  const { id } = useParams<{ id: string }>();
+type ItemResponseError = {error: string};
+
+function isErrorItem(data: Item | ItemResponseError | undefined): data is ItemResponseError  {
+  return Boolean(data && 'error' in data);
+}
+
+type ViewProps = {
+  itemModel: ItemModel;
+  refetchItem(): void;
+}
+
+const ItemPageView: FC<ViewProps> = observer((props) => {
+  const { itemModel } = props;
   const navigate = useNavigate();
 
-  const loader = useLoader();
+  const loader = useLoaderModel();
 
-  // Не использовать локальный стейт для демонстрации
-  const [item, setItem] = useState<Item | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [removeConfirmationOpened, setRemoveConfirmationOpened] = useState(false);
-
-  const fetch = useCallback(() => {
-    const hideLoader = loader.show();
-    // Специально не передал пропсом
-    // В демо тоже должен лежать отдельно в стейте (не в стейте списка для главной страницы)
-    //    что бы проверить инвалидацию при переходе между страницами
-    api.getItem(Number(id))
-      .then((response) => {
-        if ('error' in response) {
-          setError(response.error);
-          return;
-        }
-
-        setItem(response);
-      })
-      .finally(hideLoader);
-  }, []);
-
-  useEffect(() => {
-    fetch();
-  }, []);
-
-  function renderContent() {
-    if (error) {
-      return (
-        <div style={{ color: 'red' }}>{error}</div>
-      )
-    }
-
-    if (!item) {
-      return null;
-    }
-
-    return (
+  return (
+    <Container className='mt-3'>
+      <h1 className='mb-4'>Item</h1>
       <Form>
         <Form.Group className="mb-3">
           <Form.Check
             type="checkbox"
             label="Checked"
-            checked={item.checked}
-            onChange={() => setItem({ ...item, checked: !item.checked })}
+            checked={itemModel.checked}
+            onChange={() => itemModel.toggle()}
           />
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Text</Form.Label>
           <Form.Control
-            value={item.text}
-            onChange={(e) => setItem({ ...item, text: e.target.value })}
+            value={itemModel.text}
+            onChange={(e) => itemModel.text = e.target.value}
           />
         </Form.Group>
       </Form>
-    );
-  }
-
-  return (
-    <Container className='mt-3'>
-      <h1 className='mb-4'>Item</h1>
-      {renderContent()}
       <div>
         <Button
           className='m-1'
           onClick={() => {
-            if (!item) return;
             const hideLoader = loader.show();
-            api.updateItem(item)
-              .then(fetch)
+            api.updateItem(itemModel.toJs())
+              .then(props.refetchItem)
               .finally(hideLoader);
           }}
         >Save</Button>
         <Button
           className='m-1'
           variant='danger'
-          onClick={() => setRemoveConfirmationOpened(true)}
+          onClick={() => itemModel.isRemoving = true}
         >Remove</Button>
         <Button className='m-1' href='/' variant='secondary'>Back</Button>
       </div>
@@ -100,17 +71,57 @@ export const ItemPage: FC = () => {
         <li>Come back here and check that data will update</li>
       </ul>
       <ConfirmModal
-        show={removeConfirmationOpened}
+        show={itemModel.isRemoving}
         title='Remove item'
         onApply={() => {
-          if (!item) return;
           const hideLoader = loader.show();
-          api.removeItem(item.id)
+          api.removeItem(itemModel.id)
             .then(() => navigate('/'))
             .finally(hideLoader);
         }}
-        onCancel={() => setRemoveConfirmationOpened(false)}
+        onCancel={() => itemModel.isRemoving = false}
       />
     </Container>
   )
-};
+});
+
+export const ItemPage: FC = observer(() => {
+  const { id } = useParams<{ id: string }>();
+  const loader = useLoaderModel();
+
+  const {data, refetch, isFetching, isError: isItemError} = useQuery({
+    queryKey: ['item', id],
+    queryFn: () => api.getItem(Number(id)),
+  });
+
+  useEffect(() => {
+    if (isFetching) {
+      return loader.show();
+    }
+  }, [isFetching, loader]);
+
+  const [itemModel, setItemModel] = useState<ItemModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if(isItemError || isErrorItem(data)) {
+      setError((data as ItemResponseError)?.error || 'Item data loading error');
+    } else if(data) {
+      setItemModel(new ItemModel({ item: data }))
+    }
+  },[data, isItemError])
+
+  if (error) {
+    return (
+      <div style={{ color: 'red' }}>{error}</div>
+    )
+  }
+
+  if (!itemModel) {
+    return null;
+  }
+
+  return (
+    <ItemPageView itemModel={itemModel} refetchItem={refetch}/>
+  )
+})
