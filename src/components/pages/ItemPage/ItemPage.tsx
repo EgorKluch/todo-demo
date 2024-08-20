@@ -1,30 +1,28 @@
-import {FC, useEffect, useState} from "react";
-import {useNavigate, useParams} from "react-router-dom";
-import {Item} from "../../../types/Item";
+import {FC} from "react";
+import {useNavigate} from "react-router-dom";
 import {api} from "../../../api";
 import {Button, Container, Form} from "react-bootstrap";
 import {useLoaderModel} from "../../../hooks/useLoaderModel";
 import {ConfirmModal} from "../../common/ConfirmModal/ConfirmModal";
 import {observer} from "mobx-react-lite";
-import {ItemModel} from "../../../models/ItemModel";
-import {useQuery} from "@tanstack/react-query";
+import {useItemModel} from "./hooks/useItemModel";
 
-type ItemResponseError = {error: string};
+export const ItemPage: FC = observer(() => {
+  const { model: itemModel, error, refetch } = useItemModel();
 
-function isErrorItem(data: Item | ItemResponseError | undefined): data is ItemResponseError  {
-  return Boolean(data && 'error' in data);
-}
-
-type ViewProps = {
-  itemModel: ItemModel;
-  refetchItem(): void;
-}
-
-const ItemPageView: FC<ViewProps> = observer((props) => {
-  const { itemModel } = props;
   const navigate = useNavigate();
 
   const loader = useLoaderModel();
+
+  if (error) {
+    return (
+      <div style={{ color: 'red' }}>{error}</div>
+    )
+  }
+
+  if (!itemModel) {
+    return null;
+  }
 
   return (
     <Container className='mt-3'>
@@ -52,7 +50,7 @@ const ItemPageView: FC<ViewProps> = observer((props) => {
           onClick={() => {
             const hideLoader = loader.show();
             api.updateItem(itemModel.toJs())
-              .then(props.refetchItem)
+              .then(refetch)
               .finally(hideLoader);
           }}
         >Save</Button>
@@ -84,44 +82,3 @@ const ItemPageView: FC<ViewProps> = observer((props) => {
     </Container>
   )
 });
-
-export const ItemPage: FC = observer(() => {
-  const { id } = useParams<{ id: string }>();
-  const loader = useLoaderModel();
-
-  const {data, refetch, isFetching, isError: isItemError} = useQuery({
-    queryKey: ['item', id],
-    queryFn: () => api.getItem(Number(id)),
-  });
-
-  useEffect(() => {
-    if (isFetching) {
-      return loader.show();
-    }
-  }, [isFetching, loader]);
-
-  const [itemModel, setItemModel] = useState<ItemModel | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if(isItemError || isErrorItem(data)) {
-      setError((data as ItemResponseError)?.error || 'Item data loading error');
-    } else if(data) {
-      setItemModel(new ItemModel({ item: data }))
-    }
-  },[data, isItemError])
-
-  if (error) {
-    return (
-      <div style={{ color: 'red' }}>{error}</div>
-    )
-  }
-
-  if (!itemModel) {
-    return null;
-  }
-
-  return (
-    <ItemPageView itemModel={itemModel} refetchItem={refetch}/>
-  )
-})

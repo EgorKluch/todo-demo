@@ -7,35 +7,28 @@ type Opts = {
 }
 
 export class ItemListModel {
-  protected _items: ItemModel[];
-  protected _onlyChecked: boolean = false;
+  public onlyChecked: boolean = false;
+  public items: ItemModel[];
+
   protected _removingId: number | null = null;
 
   constructor(opts: Opts) {
-    this._items = opts.items.map((item) => new ItemModel({ item }));
+    this.items = opts.items.map((item) => new ItemModel({ item }));
 
     makeAutoObservable(this);
   }
 
-  get onlyChecked() {
-    return this._onlyChecked
-  }
-
-  get items() {
-    return this._items;
-  }
-
   get filteredList() {
     if (!this.onlyChecked) return this.items;
-    return this._items.filter((item) => item.checked);
+    return this.items.filter((item) => item.checked);
   }
 
   toggleOnlyChecked() {
-    this._onlyChecked = !this.onlyChecked;
+    this.onlyChecked = !this.onlyChecked;
   }
 
   add(item: Item) {
-    this._items = [...this._items, new ItemModel({ item })];
+    this.items = [...this.items, new ItemModel({ item })];
   }
 
   startRemoving(id: number) {
@@ -43,7 +36,7 @@ export class ItemListModel {
   }
 
   confirmRemoving() {
-    this._items = this._items.filter((item) => item.id !== this._removingId);
+    this.items = this.items.filter((item) => item.id !== this._removingId);
     this._removingId = null;
   }
 
@@ -57,5 +50,16 @@ export class ItemListModel {
 
   toJs() {
     return this.items.map((item) => item.toJs());
+  }
+
+  update(items: Item[]) {
+    this.items = items.map((item) => {
+      const oldItem = this.items.find(({ id }) => id === item.id);
+      if (oldItem) {
+        oldItem.update(item);
+        return oldItem;
+      }
+        return new ItemModel({ item });
+    });
   }
 }

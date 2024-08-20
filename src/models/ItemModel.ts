@@ -5,45 +5,52 @@ type Opts = {
   item: Item
 }
 
-export class ItemModel{
-  private _item: Item;
-  private _isRemoving = false;
+export class ItemModel {
+  public isRemoving = false;
+
+  protected _source: Item;
+  // Обычно работа с изменениями под капотом библиотек форм. В реальном приложении нет смысла хранить в Mobx
+  // Тут для примера оставил в модели
+  protected _changes: Partial<Item>;
 
   constructor(opts: Opts) {
-    this._item = opts.item;
+    this._source = opts.item;
+    this._changes = {};
 
     makeAutoObservable(this);
   }
 
   get id() {
-    return this._item.id;
+    return this._source.id;
   }
 
   set text(text) {
-    this._item.text = text;
+    this._changes.text = text;
   }
 
   get text() {
-    return this._item.text;
+    return this._changes.text == null ? this._source.text : this._changes.text;
   }
 
   toggle() {
-    this._item.checked = !this.checked;
+    this._changes.checked = !this.checked;
   }
 
   get checked() {
-    return this._item.checked;
+    return this._changes.checked == null ? this._source.checked : this._changes.checked;
   }
 
   toJs() {
-    return toJS(this._item);
+    return toJS({
+      ...this._source,
+      ...this._changes
+    });
   }
 
-  get isRemoving() {
-    return this._isRemoving
-  }
-
-  set isRemoving(isRemoving) {
-    this._isRemoving = isRemoving;
+  update(item: Item) {
+    if (item.id !== this.id) {
+      console.warn('ItemModel.update: you should update the same item');
+    }
+    this._source = item;
   }
 }
